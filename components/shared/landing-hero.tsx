@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ArrowRightIcon, EyeIcon, LockIcon, SwordsIcon } from "lucide-react";
@@ -62,7 +63,7 @@ export function LandingHero() {
           )}
         >
           <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-border bg-bg-surface text-status-complete shadow-sm">
-            <LockIcon className="size-5" aria-hidden />
+            <Image src="/logo.png" alt="Cerberus" width={48} height={48} className="size-full object-contain" priority />
           </div>
 
           <h1 className="max-w-2xl font-heading text-4xl font-bold leading-tight tracking-tight text-text-primary md:text-5xl lg:text-6xl">

@@ -1,11 +1,11 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   DatabaseIcon,
   ListIcon,
-  LockIcon,
   LogOutIcon,
   UploadIcon,
 } from "lucide-react";
@@ -35,7 +35,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           className="flex h-14 shrink-0 items-center gap-2 border-b border-border px-3 text-text-primary transition-colors hover:bg-muted/40 lg:px-4"
         >
           <span className="flex size-8 shrink-0 items-center justify-center rounded-md border border-border bg-bg-base text-status-complete">
-            <LockIcon className="size-4" aria-hidden />
+            <Image src="/logo.png" alt="" width={32} height={32} className="size-full object-contain" priority />
           </span>
           <span className="hidden truncate font-heading text-sm font-semibold tracking-tight lg:inline">
             Cerberus
