@@ -41,8 +41,10 @@ export function SessionPlayback({ session }: { session: Session }) {
   const totalEvents = session.findings.length + session.egressLog.length;
   const hasEvents = totalEvents > 0;
 
-  const [status, setStatus] = useState<SessionStatus>(hasEvents ? "queued" : session.status);
+    const [status, setStatus] = useState<SessionStatus>(hasEvents ? "queued" : session.status);
   const [revealedCount, setRevealedCount] = useState(0);
+
+  const isPhase2 = session.planPhase === "phase2";
 
   /** Findings + egress entries merged into one chronological reveal order. */
   const timeline = useMemo<TimelineEvent[]>(
@@ -89,7 +91,13 @@ export function SessionPlayback({ session }: { session: Session }) {
       previous?.kind === "finding" && previous.finding.result === "blocked"
         ? BLOCKED_HOLD_MS
         : 0;
-    const interval = timeline.length <= 3 ? SLOW_INTERVAL_MS : BASE_INTERVAL_MS;
+        // Phase 2 reveals as a single time-staggered wave (one checkpoint); only
+    // phase4-preview sessions keep the multi-checkpoint staggered cadence.
+    const interval = isPhase2
+      ? BASE_INTERVAL_MS
+      : timeline.length <= 3
+        ? SLOW_INTERVAL_MS
+        : BASE_INTERVAL_MS;
     const delay = (revealedCount === 0 ? FIRST_REVEAL_MS : interval) + hold;
 
     const timer = window.setTimeout(
@@ -97,7 +105,7 @@ export function SessionPlayback({ session }: { session: Session }) {
       delay,
     );
     return () => window.clearTimeout(timer);
-  }, [hasEvents, status, revealedCount, timeline]);
+    }, [hasEvents, status, revealedCount, timeline, isPhase2]);
 
   const revealed = timeline.slice(0, revealedCount);
   const revealedFindings = revealed
@@ -141,11 +149,26 @@ export function SessionPlayback({ session }: { session: Session }) {
             </h1>
             <p className="font-mono text-xs text-text-muted">session {session.id}</p>
           </div>
-          <div className="flex shrink-0 items-center gap-4">
-            <span className="text-sm text-text-muted">
-              Checkpoint {currentCheckpoint} of {session.totalCheckpoints}
-            </span>
-            <StatusBadge status={status} />
+                    <div className="flex flex-col items-end gap-2">
+            <div className="flex items-center gap-4 self-end">
+              <span className="text-sm text-text-muted">
+                {isPhase2
+                  ? `Window: ${session.windowHours}h — single checkpoint at session end`
+                  : `Checkpoint ${currentCheckpoint} of ${session.totalCheckpoints}`}
+              </span>
+              <StatusBadge status={status} />
+            </div>
+            {session.planPhase === "phase4-preview" && (
+              <>
+                <span className="inline-flex items-center rounded-md border border-violet-400/40 bg-violet-500/10 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider text-violet-400">
+                  Phase 4 preview
+                </span>
+                <p className="font-mono text-[10px] text-text-muted">
+                  Multi-checkpoint time-delayed detection is a Phase 4 capability — this session
+                  previews it ahead of schedule.
+                </p>
+              </>
+            )}
           </div>
         </div>
 
@@ -168,11 +191,12 @@ export function SessionPlayback({ session }: { session: Session }) {
       </header>
 
       <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-3">
-        <ContainPanel />
+        <ContainPanel session={session} status={status} findings={revealedFindings} />
         <AttackPanel findings={revealedFindings} waiting={waitingForFirstFinding} />
-        <WatchPanel
+                <WatchPanel
           entries={revealedEgress}
-          trustDelta={status === "complete" ? session.trustDelta : undefined}
+          trustScore={status === "complete" ? session.trustScore : undefined}
+          windowHours={session.windowHours}
         />
       </div>
 

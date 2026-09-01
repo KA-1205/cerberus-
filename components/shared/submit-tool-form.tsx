@@ -10,6 +10,7 @@ import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
 
 /**
  * SubmitToolForm - one step of the vetting pipeline.
@@ -41,7 +42,8 @@ const submitSchema = z.object({
       },
       "Enter a valid http(s) URL",
     ),
-  declaredScopes: z.array(z.object({ value: z.string() })),
+    declaredScopes: z.array(z.object({ value: z.string() })),
+    windowHours: z.number().int().min(1),
 });
 
 type SubmitFormValues = z.infer<typeof submitSchema>;
@@ -56,11 +58,13 @@ function sessionForTool(toolName: string): string {
 export function SubmitToolForm() {
   const router = useRouter();
   const [pending, setPending] = useState(false);
+  const [sessionWindow, setSessionWindow] = useState(2);
 
   const {
     control,
     register,
     handleSubmit,
+    setValue,
     formState: { errors },
   } = useForm<SubmitFormValues>({
     resolver: zodResolver(submitSchema),
@@ -70,6 +74,7 @@ export function SubmitToolForm() {
       version: "",
       sourceUrl: "",
       declaredScopes: [],
+      windowHours: 2,
     },
   });
 
@@ -190,6 +195,42 @@ export function SubmitToolForm() {
         <p className="text-xs text-text-muted">
           Leave empty if this tool needs no external access &mdash; any outbound call
           will then be blocked by default.
+        </p>
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <Label className="font-mono text-xs uppercase tracking-widest text-text-muted">
+          Session window (hours)
+        </Label>
+        <div
+          role="radiogroup"
+          aria-label="Session window in hours"
+          className="flex items-center gap-2"
+        >
+          {[1, 2, 4].map((hours) => (
+            <button
+              key={hours}
+              type="button"
+              onClick={() => {
+                setSessionWindow(hours);
+                setValue("windowHours", hours, { shouldValidate: true });
+              }}
+              aria-checked={sessionWindow === hours}
+              role="radio"
+              className={cn(
+                "font-mono text-sm font-medium",
+                sessionWindow === hours
+                  ? "border border-violet-400/40 bg-violet-500/10 px-3 py-1.5 text-violet-400"
+                  : "border border-border px-3 py-1.5 text-text-muted hover:text-text-primary",
+              )}
+            >
+              {hours} {hours === 1 ? "hour" : "hours"}
+            </button>
+          ))}
+        </div>
+        <p className="text-xs text-text-muted">
+          Phase 2 uses a short fixed window for a fast demo. The full 1–30 day
+          configurable window is a Phase 4 capability.
         </p>
       </div>
 

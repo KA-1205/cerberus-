@@ -1,5 +1,8 @@
+"use client";
+
+import { useState } from "react";
 import Link from "next/link";
-import { ArrowLeftIcon, ArrowDownIcon, ArrowUpIcon, CircleCheckIcon, FileDownIcon, TriangleAlertIcon } from "lucide-react";
+import { ArrowLeftIcon, ArrowDownIcon, ArrowUpIcon, CircleCheckIcon, FileDownIcon, Loader2Icon, TriangleAlertIcon } from "lucide-react";
 
 import { VerdictBadge } from "@/components/shared/VerdictBadge";
 import {
@@ -82,6 +85,21 @@ function StatBlock({ label, children }: { label: string; children: React.ReactNo
 export function VerdictReport({ session }: { session: Session }) {
   const blockedCount = session.egressLog.filter((entry) => entry.blocked).length;
 
+  const [verifyState, setVerifyState] = useState<"idle" | "verifying" | "done">("idle");
+
+  const handleVerify = () => {
+    if (verifyState === "verifying") return;
+    setVerifyState("verifying");
+    setTimeout(() => {
+      setVerifyState("done");
+    }, 600);
+  };
+
+  const escalationFinding = session.findings.find((f) => f.category === "escalation_attempt");
+  const redactedCount = session.egressLog.filter((e) => e.redactedPreview !== e.rawPreview).length;
+  const corpusVersion = session.findings[0]?.corpusVersion ?? "corpus-v1";
+  const patternsChecked = session.findings.length;
+
   return (
     <main className="mx-auto flex w-full max-w-[800px] flex-1 flex-col gap-4 p-4 md:p-6 lg:p-8">
       <Button
@@ -138,6 +156,33 @@ export function VerdictReport({ session }: { session: Session }) {
           </div>
         )}
 
+        {/* Verify signature - simulated re-verification (no real crypto unless Prompt 17 is run) */}
+        <div className="flex items-center gap-3">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleVerify}
+            disabled={verifyState === "verifying"}
+            className="gap-2 font-mono text-xs"
+          >
+            {verifyState === "verifying" ? (
+              <Loader2Icon className="size-3.5 animate-spin" aria-hidden />
+            ) : null}
+            {verifyState === "verifying"
+              ? "Verifying…"
+              : verifyState === "done"
+                ? `Signature ${session.signatureValid ? "valid ✓" : "invalid ✗"}`
+                : "Verify signature"}
+          </Button>
+          {verifyState === "done" && (
+            <p className="font-mono text-[11px] text-text-muted">
+              {session.signatureValid
+                ? "Ed25519 signature re-verified against session payload (simulated)."
+                : "Signature does not match session payload — verdict is untrusted (simulated)."}
+            </p>
+          )}
+        </div>
+
         {/* Plain-English reason - the one line a judge must understand instantly */}
         {session.verdictReason && (
           <blockquote className="border-l-2 border-border pl-4 text-base leading-relaxed text-text-primary">
@@ -153,29 +198,77 @@ export function VerdictReport({ session }: { session: Session }) {
           <StatBlock label="Blocked egress">
             <p className="text-2xl font-semibold text-text-primary">{blockedCount}</p>
           </StatBlock>
-          <StatBlock label="Trust delta">
-            {session.trustDelta ? (
-              <div className="flex items-center gap-1.5 text-sm font-medium">
-                {session.trustDelta.direction === "up" && (
-                  <ArrowUpIcon className="size-4 text-verdict-approved" aria-hidden />
+          <StatBlock label="Trust score">
+            <div className="flex items-center gap-1.5 text-sm font-medium">
+              {session.trustScore.direction === "up" && (
+                <ArrowUpIcon className="size-4 text-verdict-approved" aria-hidden />
+              )}
+              {session.trustScore.direction === "down" && (
+                <ArrowDownIcon className="size-4 text-verdict-rejected" aria-hidden />
+              )}
+              <span
+                className={cn(
+                  session.trustScore.direction === "up" && "text-verdict-approved",
+                  session.trustScore.direction === "down" && "text-verdict-rejected",
+                  session.trustScore.direction === undefined && "text-text-muted",
                 )}
-                {session.trustDelta.direction === "down" && (
-                  <ArrowDownIcon className="size-4 text-verdict-rejected" aria-hidden />
-                )}
-                <span
-                  className={cn(
-                    session.trustDelta.direction === "up" && "text-verdict-approved",
-                    session.trustDelta.direction === "down" && "text-verdict-rejected",
-                    session.trustDelta.direction === "none" && "text-text-muted",
-                  )}
-                >
-                  {session.trustDelta.label}
-                </span>
-              </div>
-            ) : (
-              <p className="text-sm text-text-muted">none recorded</p>
-            )}
+              >
+                {session.trustScore.label}
+              </span>
+            </div>
           </StatBlock>
+        </div>
+
+        {/* Containment Proof - compact audit checklist pulled from session mock data */}
+        <div className="flex flex-col gap-2 rounded-lg border border-border bg-bg-base p-4">
+          <p className="font-mono text-[10px] uppercase tracking-widest text-text-muted">
+            Containment Proof
+          </p>
+          <ul className="flex flex-col gap-1.5">
+            <li className="flex items-baseline gap-2 text-sm">
+              <CircleCheckIcon className="mt-0.5 size-3.5 shrink-0 text-verdict-approved" aria-hidden />
+              <span className="text-text-primary">
+                Escalation denial:{" "}
+                <span className="font-mono text-xs text-text-muted">
+                  {escalationFinding
+                    ? `${escalationFinding.result === "blocked" ? "structural, verified" : "flagged, reviewed"}`
+                    : "no attempt logged"}
+                </span>
+              </span>
+            </li>
+            <li className="flex items-baseline gap-2 text-sm">
+              <CircleCheckIcon className="mt-0.5 size-3.5 shrink-0 text-verdict-approved" aria-hidden />
+              <span className="text-text-primary">
+                Egress redaction: applied to{" "}
+                <span className="font-mono text-xs text-text-muted">{redactedCount}</span> logged calls
+              </span>
+            </li>
+            <li className="flex items-baseline gap-2 text-sm">
+              <CircleCheckIcon className="mt-0.5 size-3.5 shrink-0 text-verdict-approved" aria-hidden />
+              <span className="text-text-primary">
+                Sandbox teardown: verified clean within{" "}
+                <span className="font-mono text-xs text-text-muted">{session.teardownVerifiedWithinSeconds}s</span>
+              </span>
+            </li>
+            <li className="flex items-baseline gap-2 text-sm">
+              <CircleCheckIcon className="mt-0.5 size-3.5 shrink-0 text-verdict-approved" aria-hidden />
+              <span className="text-text-primary">
+                HTTP(S) bypass test:{" "}
+                <span className="font-mono text-xs text-text-muted">
+                  {session.bypassTestResult.blocked ? "blocked" : "not blocked"}
+                </span>
+              </span>
+            </li>
+            <li className="flex items-baseline gap-2 text-sm">
+              <CircleCheckIcon className="mt-0.5 size-3.5 shrink-0 text-verdict-approved" aria-hidden />
+              <span className="text-text-primary">
+                Corpus reference:{" "}
+                <span className="font-mono text-xs text-text-muted">
+                  {corpusVersion}, {patternsChecked} patterns checked
+                </span>
+              </span>
+            </li>
+          </ul>
         </div>
 
         {/* Raw trace */}
