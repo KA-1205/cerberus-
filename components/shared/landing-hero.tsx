@@ -98,7 +98,7 @@ export function LandingHero() {
         <div
           className={cn(
             "flex flex-col items-center gap-6 transition-all duration-500 ease-out",
-            phase >= 4 ? "opacity-100 translate-y-0" : "opacity-0 translate-y-3",
+            phase >= 3 ? "opacity-100 translate-y-0" : "opacity-0 translate-y-3",
           )}
         >
           <Button
